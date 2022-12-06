@@ -1,0 +1,294 @@
+*****Creating the Warehouse
+
+create or replace warehouse COMPUTE_WH
+with
+WAREHOUSE_SIZE = XSMALL
+MAX_CLUSTER_COUNT=3
+AUTO_SUSPEND = 300
+AUTO_RESUME=TRUE
+INITIALLY_SUSPENDED=TRUE
+
+*****Creating database, schema and file format object
+
+create or replace database analysis;
+create or replace schema conn_object;
+create or replace file format analysis.conn_object.import_format
+TYPE=CSV
+SKIP_HEADER=1;
+
+*****Creating S3 integration object
+
+create or replace storage integration s3_integration
+TYPE=EXTERNAL_STAGE
+STORAGE_PROVIDER=S3
+ENABLED=TRUE
+STORAGE_AWS_ROLE_ARN='arn:aws:iam::***************:role/snowflake-access-role'
+STORAGE_ALLOWED_LOCATIONS=('s3://import-export-analysis-raw/raw_files/')
+
+desc integration s3_integration
+
+*****Creating external stage
+
+create or replace stage aws_ext_stage
+URL='s3://import-export-analysis-raw/raw_files/'
+STORAGE_INTEGRATION=s3_integration
+FILE_FORMAT=analysis.conn_object.import_format
+
+
+*****Creating import tables in staging layer
+
+create or replace schema analysis.raw_staging;
+
+create or replace table raw_import_2015(
+product_code STRING,
+product STRING,
+unit STRING,
+country_code STRING,
+country STRING,
+quantity STRING,
+value FLOAT
+)
+
+create or replace table raw_import_2016(
+product_code STRING,
+product STRING,
+unit STRING,
+country_code STRING,
+country STRING,
+quantity STRING,
+value FLOAT
+)
+
+create or replace table raw_import_2017(
+product_code STRING,
+product STRING,
+unit STRING,
+country_code STRING,
+country STRING,
+quantity STRING,
+value FLOAT
+)
+
+create or replace table raw_import_2018(
+product STRING,
+unit STRING,
+country STRING,
+quantity STRING,
+value FLOAT
+)
+
+create or replace table raw_import_2019(
+product STRING,
+country STRING,
+unit STRING,
+quantity STRING,
+value FLOAT
+)
+
+create or replace table raw_import_2020(
+product STRING,
+country STRING,
+unit STRING,
+quantity STRING,
+value FLOAT
+)
+
+create or replace table raw_export_15_20(
+id int,
+product_code STRING,
+product STRING,
+unit STRING,
+country_code STRING,
+country STRING,
+quantity STRING,
+value FLOAT
+year STRING
+)
+
+create or replace table raw_import_2020(
+ID int,
+product STRING,
+country STRING,
+unit STRING,
+quantity STRING,
+value FLOAT
+)
+
+
+*****Copy into tables from stage
+
+copy into raw_import_2015
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('import_01.csv');
+
+
+copy into raw_import_2017
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('import_03.csv');
+
+copy into raw_import_2018
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('import_04.csv');
+
+
+copy into raw_import_2019
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('import_05.csv');
+
+copy into raw_import_2020
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('import_06.csv')
+
+
+*****Creating export tables in staging layer
+
+create or replace table raw_export_2015(
+product_code STRING,
+product STRING,
+unit STRING,
+country_code STRING,
+country STRING,
+quantity STRING,
+value FLOAT
+);
+
+create or replace table raw_export_2016(
+product_code STRING,
+product STRING,
+unit STRING,
+country_code STRING,
+country STRING,
+quantity STRING,
+value FLOAT
+);
+
+create or replace table raw_export_2017(
+product_code STRING,
+product STRING,
+unit STRING,
+country_code STRING,
+country STRING,
+quantity STRING,
+value FLOAT
+);
+
+create or replace table raw_export_2018(
+product STRING,
+unit STRING,
+country STRING,
+quantity STRING,
+value FLOAT
+);
+
+create or replace table raw_export_2019(
+product STRING,
+country STRING,
+unit STRING,
+quantity STRING,
+value FLOAT
+);
+
+create or replace table raw_export_2020(
+product STRING,
+country STRING,
+unit STRING,
+quantity STRING,
+value FLOAT
+);
+
+*****Copy into tables from stage
+
+copy into raw_export_2015
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('export_01.csv');
+
+copy into raw_export_2016
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('export_02.csv');
+
+copy into raw_export_2017
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('export_03.csv');
+
+copy into raw_export_2018
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('export_04.csv');
+
+
+copy into raw_export_2019
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('export_05.csv');
+
+copy into raw_export_2020
+from @analysis.conn_object.aws_ext_stage
+file_format = (format_name=analysis.conn_object.import_format FIELD_OPTIONALLY_ENCLOSED_BY = '"')
+files=('export_06.csv')
+
+
+********Creating the reporting layer from staging layer
+
+create or replace table all_import (
+product STRING,
+unit STRING,
+country STRING,
+quantity int,
+value float,
+year STRING
+)
+
+
+insert into analysis.reporting.all_import
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2015' from analysis.raw_staging.raw_import_2015
+union
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2016' from analysis.raw_staging.raw_import_2016
+union
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2017' from analysis.raw_staging.raw_import_2017
+union
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2018' from analysis.raw_staging.raw_import_2018
+union
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2019' from analysis.raw_staging.raw_import_2019
+union
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2020' from analysis.raw_staging.raw_import_2020;
+
+select * from all_import
+
+
+create or replace schema reporting; 
+create or replace table all_export (
+product STRING,
+unit STRING,
+country STRING,
+quantity int,
+value float,
+year STRING
+)
+select * from raw_staging.raw_import_2018
+distinct nullif(QUANTITY, 'NA')
+
+insert into analysis.reporting.all_export
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2015' from analysis.raw_staging.raw_export_2015
+union
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2016' from analysis.raw_staging.raw_export_2016
+union
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2017' from analysis.raw_staging.raw_export_2017
+union
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2018' from analysis.raw_staging.raw_export_2018
+union
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2019' from analysis.raw_staging.raw_export_2019
+union
+select product,nullif(unit,'NA'),country,cast(nullif(quantity,'NA') as int),value,'2020' from analysis.raw_staging.raw_export_2020;
+
+truncate table analysis.reporting.all_export;
+select  distinct unit from analysis.reporting.export_final
+
+
